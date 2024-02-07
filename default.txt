@@ -1,0 +1,10 @@
+392,240,True,True,True,True
+632,240,True,False,True,True
+792,240,False,True,True,True
+920,240,True,False,True,True
+392,372,True,True,False,True
+392,524,True,True,True,False
+600,524,False,True,True,True
+792,524,True,True,False,True
+392,688,True,True,False,True
+792,692,True,False,True,False
