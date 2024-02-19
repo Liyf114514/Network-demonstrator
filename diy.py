@@ -38,7 +38,7 @@ class User:
         self.channel = None
         self.cid = None            #for finding the former cluster and get current cluster
         self.strength = None       #in Dbm
-        self.interference = 0      # in mW
+        self.interference = -999      # in Dbm
         self.speed = 0
         self.ang = 0
 
@@ -107,7 +107,7 @@ def read_base_stations_sp(filename,n):
     #print(len(base_stations))
     return sp,base_stations,layer3
 
-def find_strongest_base_station(user, base_stations):
+def find_strongest_base_station(user, base_stations,secang):
     best_station = None
     best_signal_strength = float("-inf")
     x = int(user.x)
@@ -116,7 +116,13 @@ def find_strongest_base_station(user, base_stations):
         distance = math.sqrt((x - station.x) ** 2 + (y - station.y) ** 2)
         if distance <= station.signal_range:
             # 计算用户在该基站处的信号强度，考虑距离因素
-            station_signal_strength = station.signal_strength-loss(user,station)
+            #station_signal_strength = station.signal_strength-loss(user,station)
+            ang = calculate_angle(station, user)
+            if station.angl - secang / 2 <= ang < station.angl + secang / 2:
+                station_signal_strength = 10 + station.signal_strength - (loss(user, station))
+            else:
+                station_signal_strength = station.signal_strength - (loss(user, station))
+
             if station_signal_strength > best_signal_strength:
                 best_signal_strength = station_signal_strength
                 best_station = station
@@ -210,42 +216,48 @@ def loss(user,stst):
     if distance==0:
         return 0.0001
     else:
-       return 20*math.log(distance, 10)
+       return 20*math.log(distance, 10) # in db
 
-def affect(user,users):
+def affect(user,users,secang):
         station = user.cid
         if station is not None:
             for user_old in users:
                 if user_old.channel == user.channel:
                     ang = calculate_angle(station, user_old)
                     ang2 = calculate_angle(user_old.cid, user)
-                    if station.angl - 30 <= ang < station.angl + 30:
-                        user_old.interference = user_old.interference + round(1.5*station.signal_strength - (loss(user_old, station)), 3)
-                        user.interference = user.interference + round(user_old.cid.signal_strength - (loss(user, user_old.cid)), 3)
-                    elif user_old.cid.angl-30<=ang2<user_old.cid.angl + 30:
-                         user_old.interference = user_old.interference + round(station.signal_strength - (loss(user_old, station)), 3)
-                         user.interference = user.interference + round(1.5*user_old.cid.signal_strength - (loss(user, user_old.cid)), 3)
+                    if station.angl - secang/2 <= ang < station.angl + secang/2:
+                        user_old.interference = dbm_add(user_old.interference, round(station.signal_strength+10 - (loss(user_old, station)), 3))
                     else:
-                        user_old.interference = user_old.interference + round(station.signal_strength - (loss(user_old, station)), 3)
-                        user.interference = user.interference + round(user_old.cid.signal_strength - (loss(user, user_old.cid)), 3)
-
+                        user_old.interference = dbm_add(user_old.interference, round(station.signal_strength - (loss(user_old, station)), 3))
+                    if user_old.cid.angl-secang/2 <=ang2<user_old.cid.angl + secang/2:
+                        user.interference = dbm_add(user.interference,round(user_old.cid.signal_strength+10 - (loss(user, user_old.cid)), 3))
+                    else:
+                        user.interference = dbm_add(user.interference,round(user_old.cid.signal_strength - (loss(user, user_old.cid)), 3))
                 else:
                     continue
-def unaff(user,users):
+def unaff(user,users,secang):
         station = user.cid
         if station is not None:
             for user_old in users:
                 if user_old.channel == user.channel:
                     ang = calculate_angle(station,user_old)
-                    if station.angl - 30 <= ang < station.angl + 30:
-                        user_old.interference = round(user_old.interference - 1.5*station.signal_strength - (loss(user_old, station)), 3)
+                    if station.angl - secang/2 <= ang < station.angl + secang/2:
+                        user_old.interference = round(dbm_minu(user_old.interference,station.signal_strength+10 - (loss(user_old, station))), 3)
                     else:
-                        user_old.interference = round(user_old.interference - station.signal_strength - (loss(user_old, station)), 3)
+                        user_old.interference = round(dbm_minu(user_old.interference,station.signal_strength - (loss(user_old, station))), 3)
                 else:
                     continue
         else:
             print('station is none')
 
+def dbm_add(a,b):
+    c=10**(a/10)+10**(b/10)
+    c=10*math.log(c,10)
+    return c
+def dbm_minu(a,b):
+    c=abs(10**(a/10)-10**(b/10))
+    c=10*math.log(c,10)
+    return c
 # 计算六边形的顶点的函数
 def calculate_hexagon_vertices(center_x, center_y, radius):
     vertices = []
@@ -285,7 +297,7 @@ def generate_random_base_stations(num_stations, window_width, window_height,m,n,
 
 
         network_type = random.randint(1,4)
-        new_station = BaseStation(len(base_stations) + 1, int(x), int(y), (signal_strength - 20*(3-clas)), base_station_radius, network_type,0,0)
+        new_station = BaseStation(len(base_stations) + 1, int(x), int(y), (signal_strength), base_station_radius, network_type,0,0)
         new_station.layer = m ** 2 + m * n + n ** 2
         new_station.clas = clas
         #print(a,b)
@@ -526,7 +538,7 @@ def initialize(filename):
 
 
     except TypeError:
-        print("输入无效。")
+        print("Invalid input")
 
     print(channel, secang, user_s, car_s, file_pic, file_node)
     return int(channel),int(secang),float(user_s),float(car_s),str(file_pic),str(file_node)

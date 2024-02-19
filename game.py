@@ -2,6 +2,7 @@ import pygame
 import math
 import diy
 import random
+
 import time
 import paintclass
 # Initialize Pygame
@@ -49,7 +50,7 @@ class User:
         self.channel = None
         self.cid = None            #for finding the former cluster and get current cluster
         self.strength = None       #in Dbm
-        self.interference = 0      # in mW
+        self.interference = -999      # in mW
         self.speed = user_s           # should be changeable
         self.ang = random.uniform(0, 2 * math.pi)  # Random angle in radians
         self.type = None
@@ -69,7 +70,7 @@ def spmove(temp):
     New_sp = []
     for user in temp[:]:
         if user.cid:
-            diy.unaff(user, temp)
+            diy.unaff(user, temp,secang)
             diy.retchl(user.cid, user)
         if user.type ==1:
             user.x = user.x + user.speed * math.cos(user.ang)
@@ -155,16 +156,16 @@ def spmove(temp):
             temp.remove(user)
     result = []
     for user in New_user:
-        user_station, user.strength = diy.find_strongest_base_station(user, sp+base_stations)
+        user_station, user.strength = diy.find_strongest_base_station(user, sp+base_stations,secang)
         if user_station:
             diy.delchl(user_station, user)
-        diy.affect(user, result)
+        diy.affect(user, result,secang)
         result.append(user)
     for user in New_sp:
-        user_station, user.strength = diy.find_strongest_base_station(user,base_stations)
+        user_station, user.strength = diy.find_strongest_base_station(user,base_stations,secang)
         if user_station:
             diy.delchl(user_station, user)
-        diy.affect(user, result)
+        diy.affect(user, result,secang)
         result.append(user)
 
 
@@ -182,10 +183,10 @@ def randgen(users,users_sp):
             y = random.randint(0, 800)
             user = User(x, y)
             user.type = 1
-            user_station, user.strength = diy.find_strongest_base_station(user, base_stations + sp)  # 行人使用大基站和小基站
+            user_station, user.strength = diy.find_strongest_base_station(user, base_stations + sp,secang)  # 行人使用大基站和小基站
             if user_station:
                 diy.delchl(user_station, user)
-            diy.affect(user, users + users_sp)
+            diy.affect(user, users + users_sp,secang)
             users.append(user)
         elif n == 2:
             x = random.randint(0, 1000)
@@ -194,10 +195,10 @@ def randgen(users,users_sp):
             user = User(int(a), int(b))
             user.type = 2
             user.ang = 45
-            user_station, user.strength = diy.find_strongest_base_station(user, base_stations)  # 特殊载具使用大基站
+            user_station, user.strength = diy.find_strongest_base_station(user, base_stations,secang)  # 特殊载具使用大基站
             if user_station:
                 diy.delchl(user_station, user)
-            diy.affect(user, users_sp + users)
+            diy.affect(user, users_sp + users,secang)
             user.speed = car_s
             users_sp.append(user)
             # pygame.display.update()
@@ -251,10 +252,10 @@ def main():
                         x, y = event.pos
                         user = User(x, y)
                         user.type=1
-                        user_station, user.strength = diy.find_strongest_base_station(user, base_stations+sp) #行人使用大基站和小基站
+                        user_station, user.strength = diy.find_strongest_base_station(user, base_stations+sp,secang) #行人使用大基站和小基站
                         if user_station:
                             diy.delchl(user_station, user)
-                        diy.affect(user, users+users_sp)
+                        diy.affect(user, users+users_sp,secang)
                         users.append(user)
                         pygame.display.update()
                     else:
@@ -263,10 +264,10 @@ def main():
                         user = User(int(a),int(b))
                         user.type = 2
                         user.ang = 45
-                        user_station, user.strength = diy.find_strongest_base_station(user, base_stations) #特殊载具使用大基站
+                        user_station, user.strength = diy.find_strongest_base_station(user, base_stations,secang) #特殊载具使用大基站
                         if user_station:
                             diy.delchl(user_station, user)
-                        diy.affect(user,users_sp+users)
+                        diy.affect(user,users_sp+users,secang)
                         user.speed = car_s
                         users_sp.append(user)
                         pygame.display.update()
@@ -278,7 +279,7 @@ def main():
                             distance = math.sqrt((x - user.x) ** 2 + (y - user.y) ** 2)
                             if distance <= 10:  # 判断点击是否在用户附近
                                 if user.cid:
-                                    diy.unaff(user, users+users_sp)
+                                    diy.unaff(user, users+users_sp,secang)
                                     diy.retchl(user.cid, user)
                                 users.remove(user)
                                 break
@@ -288,7 +289,7 @@ def main():
                             distance = math.sqrt((x - user.x) ** 2 + (y - user.y) ** 2)
                             if distance <= 10:  # 判断点击是否在用户附近
                                 if user.cid:
-                                    diy.unaff(user, users_sp+users)
+                                    diy.unaff(user, users_sp+users,secang)
                                     diy.retchl(user.cid, user)
                                 users_sp.remove(user)
                                 break
@@ -321,6 +322,7 @@ def main():
         #screen.blit(background_image, (0, 0))
         sidebar.fill(BLACK)
         #inputbar.fill(BLACK)
+
         #randgen(users,users_sp)
 
         if state ==1:
@@ -394,22 +396,17 @@ def main():
         # 鼠标点绘制
         x, y = pygame.mouse.get_pos()
         user1 = User(x, y)
-        strongest_station, max_signal_strength = diy.find_strongest_base_station(user1, base_stations+sp)
-        z = math.sqrt(
+        strongest_station, max_signal_strength = diy.find_strongest_base_station(user1, base_stations+sp,secang)
+        z = 10*math.sqrt(
             (x - strongest_station.x) ** 2 + (y - strongest_station.y) ** 2) if strongest_station else None
 
         #detect if users are paused(change or not)
         if pause is False:
-            #users = move(update_user(users))
             users,users_sp = spmove(users+users_sp)
-            #base_stations = diy.checkstate(base_stations) #update station info
         else:
             users = users
             users_sp = users_sp
         paintclass.draw_mouse(font, sidebar,user1, strongest_station, max_signal_strength, z)
-
-
-
 
         text = font.render(f"Pause? (use space key): {pause}/ current user:{len(users),len(users_sp)}", True, WHITE)
         sidebar.blit(text, (10, 210))
